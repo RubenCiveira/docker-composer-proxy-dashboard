@@ -10,28 +10,32 @@ class Config
     private string $redirectUri;
     private array $users;
     private string $basedir;
-
-    private string $database;
-
+    private string $databaseDir;
     private string $tempGitStore;
-
+    private string $dockerStore;
+    private string $infraStore;
     private array $gitTokens;
-
     private array $registryTokens;
 
-    public function __construct() {
+    public function __construct()
+    {
         $dotenv = Dotenv::createImmutable(__DIR__ . '/../');
         $dotenv->load();
         $this->clientId = $_ENV['GOOGLE_CLIENT_ID'];
         $this->clientSecret = $_ENV['GOOGLE_SECRET'];
         $this->redirectUri = $_ENV['GOOGLE_REDIRECT_URL'];
         $this->basedir = $_ENV['BASE_DIR'];
-        $this->database = $_ENV['DATABASE'];
+        $this->databaseDir = $_ENV['DATABASE_DIR'];
         $this->tempGitStore = $_ENV['TEMP_GIT_STORE'];
+        $this->infraStore = $_ENV['INFRA_STORE'];
+        $this->dockerStore = $_ENV['DOCKER_STORE'];
         $this->registryTokens = [];
         $this->gitTokens = [];
         $this->users = [];
-        foreach($_ENV as $key=>$value) {
+        if( isset($_ENV['EXEC_PATH'])) {
+            putenv('PATH='.$_ENV['EXEC_PATH']);
+        }
+        foreach ($_ENV as $key => $value) {
             if (preg_match('/^REGISTRY_LOGIN_(\d+)_URL$/', $key, $matches)) {
                 $number = $matches[1]; // Captura el número en el medio
                 $token = $_ENV['REGISTRY_LOGIN_' . $number . '_TOKEN'];
@@ -48,19 +52,35 @@ class Config
         }
     }
 
-    public function getDatabaseFile() {
-        return $this->database;
+    public function getDatabaseDir(): string
+    {
+        return $this->databaseDir . '/';
     }
 
-    public function getTempGitStore() {
+    public function getTempGitStore(): string
+    {
         return $this->tempGitStore;
     }
 
-    public function getProxyDirectory($domain) {
+    public function getDockerStore(): string
+    {
+        return $this->dockerStore;
+    }
+
+    public function getInfraStrore(): string
+    {
+        return $this->infraStore;
+    }
+    public function getProxyDirectory($domain): string
+    {
         return $this->basedir . '/' . str_replace('.', '/', $domain) . '/';
     }
 
-    public function googleConfig()
+    public function googleVerificationUrl(): string
+    {
+        return '/' . basename($this->redirectUri);
+    }
+    public function googleConfig(): array
     {
         return [
             'clientId' => $this->clientId,
@@ -69,15 +89,18 @@ class Config
         ];
     }
 
-    public function getValidUsers() {
+    public function getValidUsers(): array
+    {
         return $this->users;
     }
 
-    public function getRegistriesCredentials() {
+    public function getRegistriesCredentials(): array
+    {
         return $this->registryTokens;
     }
 
-    public function getAuthUrl(string $repoUrl): string {
+    public function getAuthUrl(string $repoUrl): string
+    {
         // Extraer el dominio del repositorio (gitlab.com, github.com, etc.)
         $parsedUrl = parse_url($repoUrl);
         $host = $parsedUrl['host'] ?? '';

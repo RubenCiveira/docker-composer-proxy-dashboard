@@ -1,6 +1,6 @@
 <?php
 
-namespace RubenCiveiraiglesia\DockerDashboard;
+namespace RubenCiveiraiglesia\DockerDashboard\Persistence;
 
 class Store
 {
@@ -11,9 +11,9 @@ class Store
 
     private array $deleted = [];
 
-    public function __construct(Config $config)
+    public function __construct(string $filepath)
     {
-        $this->filePath = $config->getDatabaseFile();//  dirname(__FILE__) . '/../db.json';
+        $this->filePath = $filepath;
         $this->load();
     }
 

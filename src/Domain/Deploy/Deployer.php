@@ -1,58 +1,119 @@
 <?php
 
-namespace RubenCiveiraiglesia\DockerDashboard;
+namespace RubenCiveiraiglesia\DockerDashboard\Domain\Deploy;
 
+use RubenCiveiraiglesia\DockerDashboard\Config;
+use RubenCiveiraiglesia\DockerDashboard\Domain\Command\DockerRunner;
+use RubenCiveiraiglesia\DockerDashboard\Domain\Command\GitRunner;
 use RubenCiveiraiglesia\DockerDashboard\Model\Deployment;
+use RubenCiveiraiglesia\DockerDashboard\Persistence\CredentialStore;
+use RubenCiveiraiglesia\DockerDashboard\Persistence\ServiceStore;
+use Symfony\Component\Yaml\Yaml;
 
-class Deployer {
-    public function __construct(private readonly Config $config) {}
-
-    public function deploy(Deployment $deployment) {
-        $this->getFromGit( $deployment );
+class Deployer
+{
+    private readonly DockerRunner $docker;
+    private readonly GitRunner $git;
+    public function __construct(
+        private readonly Config $config,
+        private readonly CredentialStore $credentials,
+        private readonly ServiceStore $services,
+        private readonly InfrastructureDeployer $infra
+    ) {
+        $this->docker = new DockerRunner($config);
+        $this->git = new GitRunner($config);
     }
 
-    private function getFromGit(Deployment $deployment) {
-        $directory = $this->config->getTempGitStore() .  '/' . md5($deployment->repositoryPath);
-        $authUrl = $this->config->getAuthUrl($deployment->repositoryUrl);
-
-        if (!is_dir($directory . '/.git')) {
-            // Si el directorio no contiene un repositorio Git, clonarlo
-            $this->runCommand('git clone', "git clone {$authUrl} {$directory} ");
-        } else {
-            // Si ya existe, actualizar la rama principal
-            $this->runCommand('git pull', "cd {$directory} && git pull origin main");
-        }
-        $this->dockerLogin();
-        // $this->runCommand("git clone {$deployment->repositoryPath} {$deployment->repositoryUrl}");
-        $this->runCommand('docker compose', "cd {$directory}/{$deployment->repositoryPath}  && DOCKER_AUTH_CONFIG=$(cat ".$this->config->getTempGitStore()."/docker-auth.json) docker-compose up --force-recreate -d");
-        $this->setupProxy($deployment, $directory . '/' . $deployment->repositoryPath);
+    public function deploy(Deployment $deployment): void
+    {
+        $this->infra->deployInfrastructure();
+        // Tengo que añadirle los valores de claves intermedios.
+        $local = $this->git->sync($deployment->repositoryUrl, $deployment->repositoryPath);
+        $directory = $this->dumpDocker($local, $deployment);
+        // Tengo que copiar en un subdirec
+        $this->assigEnv($directory, $deployment);
+        $this->docker->runCompose("Application $deployment->name", "$directory");
+        $this->setupProxy($deployment, "$directory");
     }
 
-    private function dockerLogin(): void {
-        foreach ($this->config->getRegistriesCredentials()  as $registry => $credentials) {
-            [$username, $password] = explode(':', $credentials, 2);
-            $auths[$registry] = [
-                "auth" => base64_encode("$username:$password")
-            ];
+    private function dumpDocker(string $directory, Deployment $deployment): string
+    {
+        $target = $this->config->getDockerStore() . '/' . $deployment->name;
+        if (!is_dir($target)) {
+            mkdir($target, 0755, true);
         }
-        $config = [
-            "auths" => $auths
-        ];
-        file_put_contents($this->config->getTempGitStore() . '/docker-auth.json', json_encode($config, JSON_PRETTY_PRINT));    }
-
-    private function runCommand(string $label, string $command): void {
-        echo "<p>Ejecutando: $label\n";
-        $output = [];
-        $returnVar = null;
-        exec($command . ' 2>&1', $output, $returnVar);
-        if ($returnVar !== 0) {
-            echo "Error ejecutando comando:\n" . implode("\n", $output) . "\n";
-            throw new \RuntimeException("Error ejecutando: $command");
-        }
-        echo "Resultado:\n" . implode("\n", $output) . "\n";
+        $this->copyFiles("$directory/$deployment->repositoryPath", $target);
+        return $target;
     }
-    private function setupProxy(Deployment $deploy, string $directory): void {
-        foreach( $deploy->mappers as $path => $port ) {
+
+    private function assigEnv(string $directory, Deployment $deployment)
+    {
+        $append = false;
+        $vars = [];
+        foreach ($deployment->services as $on => $services) {
+            $service = $this->services->get($on);
+            if (!$service) {
+                throw new \Error("Servicio $on desconocido");
+            }
+            foreach ($services as $serviceName => $credentials) {
+                $vars[$serviceName] = [];
+                foreach ($credentials as $credential => $enviroment) {
+                    $value = $this->credentials->get($credential);
+                    $parts = parse_url($value);
+                    $params = [];
+                    if (isset($parsed['query'])) {
+                        parse_str($parts['query'], $params);
+                    }
+                    foreach ($enviroment as $k => $v) {
+                        $append = true;
+                        switch ($k) {
+                            case 'host':
+                                $vars[$serviceName][$v] = $on;
+                                break;
+                            case 'port':
+                                $port = "";
+                                foreach ($service->ports as $p => $i) {
+                                    $port = $p;
+                                }
+                                $vars[$serviceName][$v] = $port;
+                                break;
+                            case 'user':
+                                $vars[$serviceName][$v] = $parts['user'];
+                                break;
+                            case 'pass':
+                                $vars[$serviceName][$v] = $parts['pass'];
+                                break;
+                            case 'path':
+                                $vars[$serviceName][$v] = $parts['path'] ? substr($parts['path'], 1) : '';
+                                break;
+                            default:
+                                $vars[$serviceName][$v] = $params[$k] ?? "";
+                        }
+                    }
+                }
+                if ($append) {
+                    $dockerCompose = Yaml::parseFile($directory . '/docker-compose.yml');
+                    foreach ($dockerCompose['services'] as $serviceName => $service) {
+                        if( isset($vars[$serviceName]) ) {
+                            if( !isset($service['environment'])) {
+                                $service['environment'] = [];
+                            }
+                            foreach($vars[$serviceName] as $k=>$v) {
+                                $service['environment'][$k] = $v;
+                            }
+                            $dockerCompose['services'][$serviceName] = $service;
+                        }
+                    }
+                    file_put_contents($directory . '/docker-compose.yml', Yaml::dump($dockerCompose, 4, 2, 
+                        Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK | Yaml::DUMP_OBJECT_AS_MAP));
+                }
+            }
+        }
+    }
+
+    private function setupProxy(Deployment $deploy, string $directory): void
+    {
+        foreach ($deploy->mappers as $path => $port) {
             $proxyDirectory = $this->config->getProxyDirectory($path);
             // Crear la carpeta si no existe
             if (!is_dir($proxyDirectory)) {
@@ -62,11 +123,12 @@ class Deployer {
             file_put_contents($proxyDirectory . 'index.php', $this->getProxyScript($port));
             // Copiar el .htaccess
             file_put_contents($proxyDirectory . '.htaccess', $this->getHtaccess());
-            $this->copyFiles( $directory, $proxyDirectory );
+            $this->copyFiles($directory, $proxyDirectory);
         }
     }
-    
-    private function getProxyScript($port): string {
+
+    private function getProxyScript($port): string
+    {
         return <<<PHP
     <?php
     \$target_host = 'localhost';  // Host del servicio dentro del contenedor
@@ -154,8 +216,9 @@ class Deployer {
     echo \$body;
     PHP;
     }
-    
-    private function getHtaccess(): string {
+
+    private function getHtaccess(): string
+    {
         return <<<HTACCESS
     RewriteEngine On
     
@@ -166,38 +229,40 @@ class Deployer {
     HTACCESS;
     }
 
-    private function copyFiles(string $sourceDir, string $targetDir): void {
+    private function copyFiles(string $sourceDir, string $targetDir): void
+    {
         if (!is_dir($sourceDir)) {
             throw new \Exception("Error: El directorio del repositorio ($sourceDir) no existe.");
         }
-    
+
         // Usar rsync si está disponible (más eficiente)
         if (shell_exec("which rsync")) {
             shell_exec("rsync -a --exclude='.git' $sourceDir/ $targetDir/");
             return;
         }
-    
+
         // Si no hay rsync, usar copy manualmente
         $this->recursiveCopy($sourceDir, $targetDir);
     }
-    
+
     /**
      * Copia archivos y carpetas recursivamente.
      */
-    private function recursiveCopy(string $source, string $destination): void {
+    private function recursiveCopy(string $source, string $destination): void
+    {
         $dir = opendir($source);
         if (!is_dir($destination)) {
             mkdir($destination, 0755, true);
         }
-    
+
         while (($file = readdir($dir)) !== false) {
             if ($file === '.' || $file === '..' || $file === '.git') {
                 continue; // Saltar directorios especiales y .git
             }
-    
+
             $srcPath = $source . DIRECTORY_SEPARATOR . $file;
             $destPath = $destination . DIRECTORY_SEPARATOR . $file;
-    
+
             if (is_dir($srcPath)) {
                 $this->recursiveCopy($srcPath, $destPath);
             } else {
