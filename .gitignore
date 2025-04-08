@@ -1,5 +1,6 @@
 # Composer
 /vendor/
+/cache/
 composer.lock
 
 # Entornos y Configuración

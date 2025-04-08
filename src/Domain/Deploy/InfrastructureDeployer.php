@@ -35,7 +35,7 @@ class InfrastructureDeployer
         // Guardar el archivo docker-compose.infrastructure.yml
         file_put_contents($this->infraPath . '/docker-compose.infrastructure.yml', $dockerComposeContent);
         $this->startInfrastructure();
-        sleep(2);
+        sleep(1);
         $this->assignCredentials();
     }
 

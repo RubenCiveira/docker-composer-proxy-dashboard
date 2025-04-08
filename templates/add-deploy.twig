@@ -1,0 +1,570 @@
+{% extends "base.twig" %}
+
+{% block title %}{{ deploy is defined ? 'Editar' : 'Añadir' }} Deploy - Docker Composer Proxy{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-cloud-upload me-2"></i>{{ deploy is defined ? 'Editar' : 'Añadir' }} Deploy</h1>
+</div>
+
+{% if flash is defined and flash %}
+<div class="alert alert-{{ flash.type }} alert-dismissible fade show" role="alert">
+    {{ flash.message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<form method="post" action="{{ deploy is defined ? './' ~ deploy.name : './add-deploy' }}">
+    <div class="row">
+        <!-- Información básica -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Información Básica</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ deploy.name|default('') }}" required>
+                        <div class="form-text">Nombre único para identificar este deploy</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="repositoryUrl" class="form-label">URL del Repositorio</label>
+                        <input type="text" class="form-control" id="repositoryUrl" name="repositoryUrl" value="{{ deploy.repositoryUrl|default('') }}" required>
+                        <div class="form-text">URL del repositorio Git (ej. https://gitlab.com/phylax2/phylax-api-deploy/)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="repositoryPath" class="form-label">Ruta del Repositorio</label>
+                        <input type="text" class="form-control" id="repositoryPath" name="repositoryPath" value="{{ deploy.repositoryPath|default('') }}" required>
+                        <div class="form-text">Ruta dentro del repositorio (ej. prod, dev, etc.)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mappers (Puertos) -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Mappers (Puertos)</h5>
+                        <button type="button" class="btn btn-sm btn-primary" id="addMapper">
+                            <i class="bi bi-plus-lg me-1"></i>Añadir
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="mappersContainer">
+                        {% if deploy is defined and deploy.mappers is defined and deploy.mappers|length > 0 %}
+                            {% for app, port in deploy.mappers %}
+                                <div class="row mb-3 mapper-row">
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="mappers[app][]" placeholder="Nombre de aplicación" value="{{ app }}">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="mappers[port][]" placeholder="Puerto" value="{{ port }}">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger remove-mapper">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row mb-3 mapper-row">
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="mappers[app][]" placeholder="Nombre de aplicación">
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="mappers[port][]" placeholder="Puerto">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger remove-mapper">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-text">
+                        Configura los mapeos de puertos para cada aplicación
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Servicios y Credenciales -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Servicios y Credenciales</h5>
+                        <button type="button" class="btn btn-sm btn-success" id="addService">
+                            <i class="bi bi-plus-lg me-1"></i>Añadir Servicio
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="servicesContainer">
+                        {% if deploy is defined and deploy.services is defined and deploy.services|length > 0 %}
+                            {% for serviceName, applications in deploy.services %}
+                                <div class="service-section mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="input-group" style="max-width: 400px;">
+                                            <span class="input-group-text">Servicio</span>
+                                            <input type="text" class="form-control" name="services[name][]" value="{{ serviceName }}" placeholder="Nombre del servicio">
+                                        </div>
+                                        <div>
+                                            <button type="button" class="btn btn-sm btn-primary add-application">
+                                                <i class="bi bi-plus-lg me-1"></i>Añadir Aplicación
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-service">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="applications-container">
+                                        {% for appName, credentials in applications %}
+                                            <div class="application-section mb-3 ps-4 border-start">
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                                    <div class="input-group" style="max-width: 400px;">
+                                                        <span class="input-group-text">Aplicación</span>
+                                                        <input type="text" class="form-control" name="services[{{ loop.parent.loop.index0 }}][app][]" value="{{ appName }}" placeholder="Nombre de la aplicación">
+                                                    </div>
+                                                    <div>
+                                                        <button type="button" class="btn btn-sm btn-warning add-credential">
+                                                            <i class="bi bi-plus-lg me-1"></i>Añadir Credencial
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-application">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="credentials-container">
+                                                    {% for credName, envMappings in credentials %}
+                                                        <div class="credential-section mb-3 ps-4 border-start">
+                                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                                <div class="input-group" style="max-width: 400px;">
+                                                                    <span class="input-group-text">Credencial</span>
+                                                                    <input type="text" class="form-control" name="services[{{ loop.parent.parent.loop.index0 }}][{{ loop.parent.loop.index0 }}][cred][]" value="{{ credName }}" placeholder="Nombre de la credencial">
+                                                                </div>
+                                                                <button type="button" class="btn btn-sm btn-outline-danger remove-credential">
+                                                                    <i class="bi bi-trash"></i>
+                                                                </button>
+                                                            </div>
+                                                            
+                                                            <div class="env-mappings-container">
+                                                                <div class="row mb-2">
+                                                                    <div class="col-md-5">
+                                                                        <label class="form-label">Propiedad</label>
+                                                                    </div>
+                                                                    <div class="col-md-5">
+                                                                        <label class="form-label">Variable de Entorno</label>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                {% for propName, envName in envMappings %}
+                                                                    <div class="row mb-2 env-mapping-row">
+                                                                        <div class="col-md-5">
+                                                                            <input type="text" class="form-control" name="services[{{ loop.parent.parent.parent.loop.index0 }}][{{ loop.parent.parent.loop.index0 }}][{{ loop.parent.loop.index0 }}][prop][]" value="{{ propName }}" placeholder="Propiedad (host, user, etc.)">
+                                                                        </div>
+                                                                        <div class="col-md-5">
+                                                                            <input type="text" class="form-control" name="services[{{ loop.parent.parent.parent.loop.index0 }}][{{ loop.parent.parent.loop.index0 }}][{{ loop.parent.loop.index0 }}][env][]" value="{{ envName }}" placeholder="ENV (DB_HOST, DB_USER, etc.)">
+                                                                        </div>
+                                                                        <div class="col-md-2">
+                                                                            <button type="button" class="btn btn-outline-danger remove-mapping">
+                                                                                <i class="bi bi-trash"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                {% endfor %}
+                                                                
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary add-mapping mt-2">
+                                                                    <i class="bi bi-plus-lg me-1"></i>Añadir Mapeo
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Plantilla inicial para un servicio -->
+                            <div class="service-section mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="input-group" style="max-width: 400px;">
+                                        <span class="input-group-text">Servicio</span>
+                                        <input type="text" class="form-control" name="services[name][]" placeholder="Nombre del servicio">
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-primary add-application">
+                                            <i class="bi bi-plus-lg me-1"></i>Añadir Aplicación
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-service">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="applications-container">
+                                    <!-- Plantilla inicial para una aplicación -->
+                                    <div class="application-section mb-3 ps-4 border-start">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <div class="input-group" style="max-width: 400px;">
+                                                <span class="input-group-text">Aplicación</span>
+                                                <input type="text" class="form-control" name="services[0][app][]" placeholder="Nombre de la aplicación">
+                                            </div>
+                                            <div>
+                                                <button type="button" class="btn btn-sm btn-warning add-credential">
+                                                    <i class="bi bi-plus-lg me-1"></i>Añadir Credencial
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger remove-application">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="credentials-container">
+                                            <!-- Plantilla inicial para una credencial -->
+                                            <div class="credential-section mb-3 ps-4 border-start">
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                                    <div class="input-group" style="max-width: 400px;">
+                                                        <span class="input-group-text">Credencial</span>
+                                                        <input type="text" class="form-control" name="services[0][0][cred][]" placeholder="Nombre de la credencial">
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger remove-credential">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                                
+                                                <div class="env-mappings-container">
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-5">
+                                                            <label class="form-label">Propiedad</label>
+                                                        </div>
+                                                        <div class="col-md-5">
+                                                            <label class="form-label">Variable de Entorno</label>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2 env-mapping-row">
+                                                        <div class="col-md-5">
+                                                            <input type="text" class="form-control" name="services[0][0][0][prop][]" placeholder="Propiedad (host, user, etc.)">
+                                                        </div>
+                                                        <div class="col-md-5">
+                                                            <input type="text" class="form-control" name="services[0][0][0][env][]" placeholder="ENV (DB_HOST, DB_USER, etc.)">
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <button type="button" class="btn btn-outline-danger remove-mapping">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary add-mapping mt-2">
+                                                        <i class="bi bi-plus-lg me-1"></i>Añadir Mapeo
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-end mb-5">
+        <a href="{{ deploy is defined ? '..' : '.' }}" class="btn btn-outline-secondary me-2">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-cloud-upload me-1"></i>{{ deploy is defined ? 'Actualizar' : 'Crear' }} Deploy
+        </button>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mappers
+    document.getElementById('addMapper').addEventListener('click', function() {
+        const container = document.getElementById('mappersContainer');
+        const newRow = document.createElement('div');
+        newRow.className = 'row mb-3 mapper-row';
+        newRow.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="mappers[app][]" placeholder="Nombre de aplicación">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="mappers[port][]" placeholder="Puerto">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger remove-mapper">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(newRow);
+        
+        // Añadir evento al nuevo botón de eliminar
+        newRow.querySelector('.remove-mapper').addEventListener('click', function() {
+            container.removeChild(newRow);
+        });
+    });
+    
+    // Añadir eventos a los botones de eliminar mapper existentes
+    document.querySelectorAll('.remove-mapper').forEach(button => {
+        button.addEventListener('click', function() {
+            const row = this.closest('.mapper-row');
+            row.parentNode.removeChild(row);
+        });
+    });
+    
+    // Servicios
+    document.getElementById('addService').addEventListener('click', function() {
+        const container = document.getElementById('servicesContainer');
+        const serviceCount = container.querySelectorAll('.service-section').length;
+        
+        const newService = document.createElement('div');
+        newService.className = 'service-section mb-4';
+        newService.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="input-group" style="max-width: 400px;">
+                    <span class="input-group-text">Servicio</span>
+                    <input type="text" class="form-control" name="services[name][]" placeholder="Nombre del servicio">
+                </div>
+                <div>
+                    <button type="button" class="btn btn-sm btn-primary add-application">
+                        <i class="bi bi-plus-lg me-1"></i>Añadir Aplicación
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-service">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="applications-container"></div>
+        `;
+        container.appendChild(newService);
+        
+        // Añadir eventos a los nuevos botones
+        setupServiceEvents(newService, serviceCount);
+    });
+    
+    // Configurar eventos para servicios existentes
+    document.querySelectorAll('.service-section').forEach((service, serviceIndex) => {
+        setupServiceEvents(service, serviceIndex);
+    });
+    
+    function setupServiceEvents(serviceElement, serviceIndex) {
+        // Eliminar servicio
+        serviceElement.querySelector('.remove-service').addEventListener('click', function() {
+            serviceElement.parentNode.removeChild(serviceElement);
+            updateServiceIndices();
+        });
+        
+        // Añadir aplicación
+        serviceElement.querySelector('.add-application').addEventListener('click', function() {
+            const appsContainer = serviceElement.querySelector('.applications-container');
+            const appCount = appsContainer.querySelectorAll('.application-section').length;
+            
+            const newApp = document.createElement('div');
+            newApp.className = 'application-section mb-3 ps-4 border-start';
+            newApp.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="input-group" style="max-width: 400px;">
+                        <span class="input-group-text">Aplicación</span>
+                        <input type="text" class="form-control" name="services[${serviceIndex}][app][]" placeholder="Nombre de la aplicación">
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-warning add-credential">
+                            <i class="bi bi-plus-lg me-1"></i>Añadir Credencial
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-application">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="credentials-container"></div>
+            `;
+            appsContainer.appendChild(newApp);
+            
+            // Configurar eventos para la nueva aplicación
+            setupApplicationEvents(newApp, serviceIndex, appCount);
+        });
+        
+        // Configurar eventos para aplicaciones existentes
+        serviceElement.querySelectorAll('.application-section').forEach((app, appIndex) => {
+            setupApplicationEvents(app, serviceIndex, appIndex);
+        });
+    }
+    
+    function setupApplicationEvents(appElement, serviceIndex, appIndex) {
+        // Eliminar aplicación
+        appElement.querySelector('.remove-application').addEventListener('click', function() {
+            appElement.parentNode.removeChild(appElement);
+            updateAppIndices(appElement.closest('.service-section'));
+        });
+        
+        // Añadir credencial
+        appElement.querySelector('.add-credential').addEventListener('click', function() {
+            const credsContainer = appElement.querySelector('.credentials-container');
+            const credCount = credsContainer.querySelectorAll('.credential-section').length;
+            
+            const newCred = document.createElement('div');
+            newCred.className = 'credential-section mb-3 ps-4 border-start';
+            newCred.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="input-group" style="max-width: 400px;">
+                        <span class="input-group-text">Credencial</span>
+                        <input type="text" class="form-control" name="services[${serviceIndex}][${appIndex}][cred][]" placeholder="Nombre de la credencial">
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-credential">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                
+                <div class="env-mappings-container">
+                    <div class="row mb-2">
+                        <div class="col-md-5">
+                            <label class="form-label">Propiedad</label>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Variable de Entorno</label>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2 env-mapping-row">
+                        <div class="col-md-5">
+                            <input type="text" class="form-control" name="services[${serviceIndex}][${appIndex}][${credCount}][prop][]" placeholder="Propiedad (host, user, etc.)">
+                        </div>
+                        <div class="col-md-5">
+                            <input type="text" class="form-control" name="services[${serviceIndex}][${appIndex}][${credCount}][env][]" placeholder="ENV (DB_HOST, DB_USER, etc.)">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-outline-danger remove-mapping">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-sm btn-outline-secondary add-mapping mt-2">
+                        <i class="bi bi-plus-lg me-1"></i>Añadir Mapeo
+                    </button>
+                </div>
+            `;
+            credsContainer.appendChild(newCred);
+            
+            // Configurar eventos para la nueva credencial
+            setupCredentialEvents(newCred, serviceIndex, appIndex, credCount);
+        });
+        
+        // Configurar eventos para credenciales existentes
+        appElement.querySelectorAll('.credential-section').forEach((cred, credIndex) => {
+            setupCredentialEvents(cred, serviceIndex, appIndex, credIndex);
+        });
+    }
+    
+    function setupCredentialEvents(credElement, serviceIndex, appIndex, credIndex) {
+        // Eliminar credencial
+        credElement.querySelector('.remove-credential').addEventListener('click', function() {
+            credElement.parentNode.removeChild(credElement);
+            updateCredIndices(credElement.closest('.application-section'));
+        });
+        
+        // Añadir mapeo
+        credElement.querySelector('.add-mapping').addEventListener('click', function() {
+            const mappingsContainer = credElement.querySelector('.env-mappings-container');
+            const newMapping = document.createElement('div');
+            newMapping.className = 'row mb-2 env-mapping-row';
+            newMapping.innerHTML = `
+                <div class="col-md-5">
+                    <input type="text" class="form-control" name="services[${serviceIndex}][${appIndex}][${credIndex}][prop][]" placeholder="Propiedad (host, user, etc.)">
+                </div>
+                <div class="col-md-5">
+                    <input type="text" class="form-control" name="services[${serviceIndex}][${appIndex}][${credIndex}][env][]" placeholder="ENV (DB_HOST, DB_USER, etc.)">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-outline-danger remove-mapping">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+            // Insertar antes del botón de añadir
+            mappingsContainer.insertBefore(newMapping, mappingsContainer.querySelector('.add-mapping'));
+            
+            // Añadir evento al nuevo botón de eliminar
+            newMapping.querySelector('.remove-mapping').addEventListener('click', function() {
+                mappingsContainer.removeChild(newMapping);
+            });
+        });
+        
+        // Configurar eventos para mapeos existentes
+        credElement.querySelectorAll('.remove-mapping').forEach(button => {
+            button.addEventListener('click', function() {
+                const row = this.closest('.env-mapping-row');
+                row.parentNode.removeChild(row);
+            });
+        });
+    }
+    
+    // Actualizar índices después de eliminar elementos
+    function updateServiceIndices() {
+        document.querySelectorAll('.service-section').forEach((service, serviceIndex) => {
+            service.querySelectorAll('.application-section').forEach((app, appIndex) => {
+                app.querySelectorAll('input[name^="services["]').forEach(input => {
+                    input.name = input.name.replace(/services\[\d+\]/, `services[${serviceIndex}]`);
+                });
+                
+                app.querySelectorAll('.credential-section').forEach((cred, credIndex) => {
+                    cred.querySelectorAll('input[name^="services["]').forEach(input => {
+                        input.name = input.name.replace(/services\[\d+\]\[\d+\]/, `services[${serviceIndex}][${appIndex}]`);
+                    });
+                });
+            });
+        });
+    }
+    
+    function updateAppIndices(serviceElement) {
+        const serviceIndex = Array.from(document.querySelectorAll('.service-section')).indexOf(serviceElement);
+        
+        serviceElement.querySelectorAll('.application-section').forEach((app, appIndex) => {
+            app.querySelectorAll('input[name^="services["]').forEach(input => {
+                input.name = input.name.replace(/services\[\d+\]\[\d+\]/, `services[${serviceIndex}][${appIndex}]`);
+            });
+            
+            app.querySelectorAll('.credential-section').forEach((cred, credIndex) => {
+                cred.querySelectorAll('input[name^="services["]').forEach(input => {
+                    input.name = input.name.replace(/services\[\d+\]\[\d+\]\[\d+\]/, `services[${serviceIndex}][${appIndex}][${credIndex}]`);
+                });
+            });
+        });
+    }
+    
+    function updateCredIndices(appElement) {
+        const serviceElement = appElement.closest('.service-section');
+        const serviceIndex = Array.from(document.querySelectorAll('.service-section')).indexOf(serviceElement);
+        const appIndex = Array.from(serviceElement.querySelectorAll('.application-section')).indexOf(appElement);
+        
+        appElement.querySelectorAll('.credential-section').forEach((cred, credIndex) => {
+            cred.querySelectorAll('input[name^="services["]').forEach(input => {
+                input.name = input.name.replace(/services\[\d+\]\[\d+\]\[\d+\]/, `services[${serviceIndex}][${appIndex}][${credIndex}]`);
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

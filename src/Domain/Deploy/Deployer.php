@@ -184,6 +184,11 @@ class Deployer
     \$headers["X-Forwarded-For"] = \$_SERVER['REMOTE_ADDR'];
     \$headers["X-Forwarded-Host"] = \$_SERVER['HTTP_HOST'];
     \$headers["X-Forwarded-Proto"] = isset(\$_SERVER['HTTPS']) ? 'https' : 'http';
+    \$prefix = dirname(\$_SERVER['SCRIPT_NAME']);
+    if (\$prefix === DIRECTORY_SEPARATOR) {
+        \$prefix = '';
+    }
+    \$headers["X-Forwarded-Prefix"] = \$prefix;
 
     // ** Manejo de HTTP normal **
     \$ch = curl_init();

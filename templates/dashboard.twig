@@ -1,0 +1,251 @@
+{% extends "base.twig" %}
+
+{% block title %}Dashboard - Docker Composer Proxy{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
+</div>
+
+{% if flash is defined and flash %}
+<div class="alert alert-{{ flash.type }} alert-dismissible fade show" role="alert">
+    {{ flash.message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-window me-2"></i>Aplicaciones</h5>
+                    <a href="./add-deploy" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i>Deploy
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if applications|length > 0 %}
+                                {% for app in applications %}
+                                <tr>
+                                    <td>{{ app.name }}</td>
+                                    <td>
+                                        {% if app.status == 'running' %}
+                                        <span class="badge bg-success">Ejecutando</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Detenido</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            {% if app.status == 'running' %}
+                                            <a href="./stop/{{ app.name }}" class="btn btn-outline-danger">
+                                                <i class="bi bi-stop-fill"></i>
+                                            </a>
+                                            <a href="./restart/{{ app.name }}" class="btn btn-outline-secondary">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </a>
+                                            {% else %}
+                                            <a href="./start/{{ app.name }}" class="btn btn-outline-success">
+                                                <i class="bi bi-play-fill"></i>
+                                            </a>
+                                            {% endif %}
+                                            <a href="./edit-deploy/{{ app.name }}" class="btn btn-outline-primary">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center">No hay aplicaciones disponibles</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Servicios</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if services|length > 0 %}
+                                {% for service in services %}
+                                <tr>
+                                    <td>{{ service.name }}</td>
+                                    <td>
+                                        {% if service.status == 'running' %}
+                                        <span class="badge bg-success">Ejecutando</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Detenido</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            {% if service.status == 'running' %}
+                                            <a href="./stop-service/{{ service.name }}" class="btn btn-outline-danger">
+                                                <i class="bi bi-stop-fill"></i>
+                                            </a>
+                                            <a href="./restart-service/{{ service.name }}" class="btn btn-outline-secondary">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </a>
+                                            {% else %}
+                                            <a href="./start-service/{{ service.name }}" class="btn btn-outline-success">
+                                                <i class="bi bi-play-fill"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center">No hay servicios disponibles</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Nueva sección para credenciales -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-key me-2"></i>Credenciales</h5>
+                    <button type="button" class="btn btn-sm btn-warning">
+                        <i class="bi bi-plus-lg me-1"></i>Nueva credencial
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Servicio</th>
+                                <th>Usuario</th>
+                                <th>Contraseña</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if credentials|length > 0 %}
+                                {% for cred in credentials %}
+                                <tr>
+                                    <td>{{ cred.service }}</td>
+                                    <td>{{ cred.username }}</td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="password" class="form-control form-control-sm" value="{{ cred.password }}" readonly>
+                                            <button class="btn btn-outline-secondary toggle-password" type="button">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary copy-password" type="button" data-bs-toggle="tooltip" title="Copiar">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="./edit-credential/{{ cred.id }}" class="btn btn-outline-primary">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="./delete-credential/{{ cred.id }}" class="btn btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No hay credenciales disponibles</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script para manejar la visibilidad de las contraseñas -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle password visibility
+    document.querySelectorAll('.toggle-password').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            const icon = this.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        });
+    });
+    
+    // Copy password to clipboard
+    document.querySelectorAll('.copy-password').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling.previousElementSibling;
+            input.type = 'text';
+            input.select();
+            document.execCommand('copy');
+            input.type = 'password';
+            
+            // Show tooltip
+            const tooltip = new bootstrap.Tooltip(this, {
+                title: '¡Copiado!',
+                trigger: 'manual'
+            });
+            tooltip.show();
+            
+            // Hide tooltip after 2 seconds
+            setTimeout(() => {
+                tooltip.hide();
+            }, 2000);
+        });
+    });
+});
+</script>
+{% endblock %}
