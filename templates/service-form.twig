@@ -1,0 +1,354 @@
+{% extends "base.twig" %}
+
+{% block title %}{{ service is defined ? 'Editar' : 'Crear' }} Servicio - Docker Composer Proxy{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-gear me-2"></i>{{ service is defined ? 'Editar' : 'Crear' }} Servicio</h1>
+</div>
+
+{% if flash is defined and flash %}
+<div class="alert alert-{{ flash.type }} alert-dismissible fade show" role="alert">
+    {{ flash.message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<form method="post" action="{{ service is defined ? './' ~ service.name : './add-service' }}">
+    <div class="row">
+        <!-- Información básica -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Información Básica</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nombre del Servicio</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ service.name|default('') }}" {{ service is defined ? 'readonly' : 'required' }}>
+                        <div class="form-text">Nombre único para identificar este servicio</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="kind" class="form-label">Tipo de Servicio</label>
+                        <select class="form-select" id="kind" name="kind" required>
+                            <option value="">Seleccionar tipo...</option>
+                            {% for type in serviceTypes %}
+                                <option value="{{ type }}" {{ service is defined and service.kind == type ? 'selected' : '' }}>{{ type|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Tipo de servicio que se va a desplegar</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Imagen Docker</label>
+                        <input type="text" class="form-control" id="image" name="image" value="{{ service.image|default('') }}" required>
+                        <div class="form-text">Imagen Docker a utilizar (ej. postgres:17, mysql:8, etc.)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Variables de Entorno -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-braces me-2"></i>Variables de Entorno</h5>
+                        <button type="button" class="btn btn-sm btn-primary" id="addEnvironment">
+                            <i class="bi bi-plus-lg me-1"></i>Añadir Variable
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="environmentContainer">
+                        {% if service is defined and service.environment is defined and service.environment|length > 0 %}
+                            {% for key, value in service.environment %}
+                                <div class="row mb-3 environment-row">
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="environment[key][]" placeholder="Nombre de variable" value="{{ key }}">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="environment[value][]" placeholder="Valor" value="{{ value }}">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger remove-environment">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row mb-3 environment-row">
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="environment[key][]" placeholder="Nombre de variable">
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="environment[value][]" placeholder="Valor">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger remove-environment">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-text">
+                        Configura las variables de entorno para el servicio
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Puertos -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Puertos</h5>
+                        <button type="button" class="btn btn-sm btn-success" id="addPort">
+                            <i class="bi bi-plus-lg me-1"></i>Añadir Puerto
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="portsContainer">
+                        {% if service is defined and service.ports is defined and service.ports|length > 0 %}
+                            {% for host, container in service.ports %}
+                                <div class="row mb-3 port-row">
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="ports[host][]" placeholder="Puerto host" value="{{ host }}">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="ports[container][]" placeholder="Puerto contenedor" value="{{ container }}">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger remove-port">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row mb-3 port-row">
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="ports[host][]" placeholder="Puerto host">
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="ports[container][]" placeholder="Puerto contenedor">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger remove-port">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-text">
+                        Configura los puertos expuestos (host:contenedor)
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Volúmenes -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-hdd me-2"></i>Volúmenes</h5>
+                        <button type="button" class="btn btn-sm btn-warning" id="addVolume">
+                            <i class="bi bi-plus-lg me-1"></i>Añadir Volumen
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="volumesContainer">
+                        {% if service is defined and service.volumes is defined and service.volumes|length > 0 %}
+                            {% for host, container in service.volumes %}
+                                <div class="row mb-3 volume-row">
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="volumes[host][]" placeholder="Ruta host" value="{{ host }}">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="volumes[container][]" placeholder="Ruta contenedor" value="{{ container }}">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger remove-volume">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row mb-3 volume-row">
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="volumes[host][]" placeholder="Ruta host">
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="text" class="form-control" name="volumes[container][]" placeholder="Ruta contenedor">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger remove-volume">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-text">
+                        Configura los volúmenes de datos (host:contenedor)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-end mb-5">
+        <a href="{{ service is defined ? '..' : '.' }}" class="btn btn-outline-secondary me-2">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{{ service is defined ? 'Actualizar' : 'Crear' }} Servicio
+        </button>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Variables de Entorno
+    document.getElementById('addEnvironment').addEventListener('click', function() {
+        const container = document.getElementById('environmentContainer');
+        const newRow = document.createElement('div');
+        newRow.className = 'row mb-3 environment-row';
+        newRow.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="environment[key][]" placeholder="Nombre de variable">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="environment[value][]" placeholder="Valor">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger remove-environment">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(newRow);
+        
+        // Añadir evento al nuevo botón de eliminar
+        newRow.querySelector('.remove-environment').addEventListener('click', function() {
+            container.removeChild(newRow);
+        });
+    });
+    
+    // Añadir eventos a los botones de eliminar environment existentes
+    document.querySelectorAll('.remove-environment').forEach(button => {
+        button.addEventListener('click', function() {
+            const row = this.closest('.environment-row');
+            row.parentNode.removeChild(row);
+        });
+    });
+    
+    // Puertos
+    document.getElementById('addPort').addEventListener('click', function() {
+        const container = document.getElementById('portsContainer');
+        const newRow = document.createElement('div');
+        newRow.className = 'row mb-3 port-row';
+        newRow.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="ports[host][]" placeholder="Puerto host">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="ports[container][]" placeholder="Puerto contenedor">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger remove-port">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(newRow);
+        
+        // Añadir evento al nuevo botón de eliminar
+        newRow.querySelector('.remove-port').addEventListener('click', function() {
+            container.removeChild(newRow);
+        });
+    });
+    
+    // Añadir eventos a los botones de eliminar port existentes
+    document.querySelectorAll('.remove-port').forEach(button => {
+        button.addEventListener('click', function() {
+            const row = this.closest('.port-row');
+            row.parentNode.removeChild(row);
+        });
+    });
+    
+    // Volúmenes
+    document.getElementById('addVolume').addEventListener('click', function() {
+        const container = document.getElementById('volumesContainer');
+        const newRow = document.createElement('div');
+        newRow.className = 'row mb-3 volume-row';
+        newRow.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="volumes[host][]" placeholder="Ruta host">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="volumes[container][]" placeholder="Ruta contenedor">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger remove-volume">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(newRow);
+        
+        // Añadir evento al nuevo botón de eliminar
+        newRow.querySelector('.remove-volume').addEventListener('click', function() {
+            container.removeChild(newRow);
+        });
+    });
+    
+    // Añadir eventos a los botones de eliminar volume existentes
+    document.querySelectorAll('.remove-volume').forEach(button => {
+        button.addEventListener('click', function() {
+            const row = this.closest('.volume-row');
+            row.parentNode.removeChild(row);
+        });
+    });
+    
+    // Validación básica del formulario
+    document.querySelector('form').addEventListener('submit', function(event) {
+        let isValid = true;
+        
+        // Validar que haya al menos una variable de entorno
+        if (document.querySelectorAll('.environment-row').length === 0) {
+            alert('Debe añadir al menos una variable de entorno');
+            isValid = false;
+        }
+        
+        // Validar que haya al menos un puerto
+        if (document.querySelectorAll('.port-row').length === 0) {
+            alert('Debe añadir al menos un puerto');
+            isValid = false;
+        }
+        
+        // Validar que haya al menos un volumen
+        if (document.querySelectorAll('.volume-row').length === 0) {
+            alert('Debe añadir al menos un volumen');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            event.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

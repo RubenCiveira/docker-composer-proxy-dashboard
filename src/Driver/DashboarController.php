@@ -32,11 +32,17 @@ class DashboarController
         $app->get($this->getVerifyAuthorizationLocation(), [$this, 'verifyAuthorization']);
         
         $app->get('/', [$this, 'index']);
+        $app->get('/deploy/{name}', [$this, 'deploy']);
+
         $app->get('/add-deploy', [$this, 'showAddDeploy']);
         $app->post('/add-deploy', [$this, 'addDeploy']);
         $app->get('/edit-deploy/{name}', [$this, 'showEditDeploy']);
         $app->post('/edit-deploy/{name}', [$this, 'editDeploy']);
-        $app->get('/deploy/{name}', [$this, 'deploy']);
+
+        $app->get('/add-service', [$this, 'showAddService']);
+        $app->post('/add-service', [$this, 'addService']);
+        $app->get('/edit-service/{name}', [$this, 'showEditService']);
+        $app->post('/edit-service/{name}', [$this, 'editService']);
     }
 
     public function authorize(Request $request, RequestHandlerInterface $handler): Response
@@ -76,10 +82,68 @@ class DashboarController
         }
     }
 
+    public function addService(Request $request, Response $response): Response
+    {
+        // Obtener todos los datos POST
+        $service = $this->mapService('./add-service', $request, $response);
+        if( is_a($service, Response::class) ) {
+            return $service;
+        }
+        $services = new ServiceStore($this->config);
+        $services->set($service['name'], $service);
+        // Mensaje de éxito
+        $_SESSION['flash'] = [
+            'type' => 'success',
+            'message' => 'Service creado correctamente: ' . $service['name']
+        ];
+        // Redirigir a la lista de deploys
+        return $response->withHeader('Location', './')->withStatus(302);
+    }
+
+    public function editService(Request $request, Response $response, array $args): Response
+    {
+        $name = $args['name']; // Obtiene el parámetro de la URL
+
+        // Obtener todos los datos POST
+        $service = $this->mapService('./edit-service/' . $name, $request, $response);
+        if( is_a($service, Response::class) ) {
+            return $service;
+        }
+
+        $services = new ServiceStore($this->config);
+        $services->set($name, $service);
+        // Mensaje de éxito
+        $_SESSION['flash'] = [
+            'type' => 'success',
+            'message' => 'Deploy creado correctamente: ' . $service['name']
+        ];
+        // Redirigir a la lista de deploys
+        return $response->withHeader('Location', './' . $name)->withStatus(302);
+    }
+
+    public function showAddService(Request $request, Response $response): Response
+    {
+        $response->getBody()->write( $this->template('service-form.twig', [
+            'serviceTypes' => ['postgres', 'mysql', 'redis', 'mongodb', 'nginx', 'apache']
+        ]) );
+        return $response;
+    }
+
+    public function showEditService(Request $request, Response $response, array $args): Response
+    {
+        $name = $args['name']; // Obtiene el parámetro de la URL
+        $services = new ServiceStore($this->config);
+        $service = $services->get( $name );
+        $response->getBody()->write( $this->template('service-form.twig', [
+            'serviceTypes' => ['postgres', 'mysql', 'redis', 'mongodb', 'nginx', 'apache'],
+            'service' => $service]) );
+        return $response;
+    }
+
     public function addDeploy(Request $request, Response $response): Response
     {
         // Obtener todos los datos POST
-        $deploy = $this->map('./add-deploy', $request, $response);
+        $deploy = $this->mapDeploy('./add-deploy', $request, $response);
         if( is_a($deploy, Response::class) ) {
             return $deploy;
         }
@@ -99,7 +163,7 @@ class DashboarController
         $name = $args['name']; // Obtiene el parámetro de la URL
 
         // Obtener todos los datos POST
-        $deploy = $this->map('./edit-deploy/' . $name, $request, $response);
+        $deploy = $this->mapDeploy('./edit-deploy/' . $name, $request, $response);
         if( is_a($deploy, Response::class) ) {
             return $deploy;
         }
@@ -117,7 +181,7 @@ class DashboarController
 
     public function showAddDeploy(Request $request, Response $response): Response
     {
-        $response->getBody()->write( $this->template('add-deploy.twig', []) );
+        $response->getBody()->write( $this->template('deploy-form.twig', []) );
         return $response;
     }
 
@@ -126,7 +190,7 @@ class DashboarController
         $name = $args['name']; // Obtiene el parámetro de la URL
         $applications = new ApplicationStore($this->config);
         $app = $applications->get( $name );
-        $response->getBody()->write( $this->template('add-deploy.twig', ['deploy' => $app]) );
+        $response->getBody()->write( $this->template('deploy-form.twig', ['deploy' => $app]) );
         return $response;
     }
 
@@ -224,7 +288,38 @@ class DashboarController
         return $html;
     }
 
-    private function map(string $back, Request $request, Response $response): array|Response {
+    private function mapService(string $back, Request $request, Response $response): array|Response {
+        $data = $request->getParsedBody();
+        // Transformar los datos del formulario a la estructura esperada
+        $service = [
+            'name' => $data['name'],
+            'image' => $data['image'],
+            'kind' => $data['kind'],
+            'environment' => [],
+            'ports' => [],
+            'volumes' => []
+        ];
+        
+        // Procesar variables de entorno
+        if (isset($data['environment']['key']) && isset($data['environment']['value'])) {
+            foreach ($data['environment']['key'] as $index => $key) {
+                if (!empty($key)) {
+                    $service['environment'][$key] = $data['environment']['value'][$index];
+                }
+            }
+        }
+        
+        // Procesar puertos
+        if (isset($data['ports']['host']) && isset($data['ports']['container'])) {
+            foreach ($data['ports']['host'] as $index => $host) {
+                if (!empty($host)) {
+                    $service['ports'][$host] = $data['ports']['container'][$index];
+                }
+            }
+        }
+        return $service;
+    }
+    private function mapDeploy(string $back, Request $request, Response $response): array|Response {
         $postData = $request->getParsedBody();
             
         // Validar datos básicos
