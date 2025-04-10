@@ -34,15 +34,10 @@ class DashboarController
         $app->get('/', [$this, 'index']);
         $app->get('/deploy/{name}', [$this, 'deploy']);
 
-        $app->get('/add-deploy', [$this, 'showAddDeploy']);
-        $app->post('/add-deploy', [$this, 'addDeploy']);
-        $app->get('/edit-deploy/{name}', [$this, 'showEditDeploy']);
-        $app->post('/edit-deploy/{name}', [$this, 'editDeploy']);
-
-        $app->get('/add-service', [$this, 'showAddService']);
-        $app->post('/add-service', [$this, 'addService']);
-        $app->get('/edit-service/{name}', [$this, 'showEditService']);
-        $app->post('/edit-service/{name}', [$this, 'editService']);
+        // $app->get('/add-service', [$this, 'showAddService']);
+        // $app->post('/add-service', [$this, 'addService']);
+        // $app->get('/edit-service/{name}', [$this, 'showEditService']);
+        // $app->post('/edit-service/{name}', [$this, 'editService']);
     }
 
     public function authorize(Request $request, RequestHandlerInterface $handler): Response
@@ -82,124 +77,12 @@ class DashboarController
         }
     }
 
-    public function addService(Request $request, Response $response): Response
-    {
-        // Obtener todos los datos POST
-        $service = $this->mapService('./add-service', $request, $response);
-        if( is_a($service, Response::class) ) {
-            return $service;
-        }
-        $services = new ServiceStore($this->config);
-        $services->set($service['name'], $service);
-        // Mensaje de éxito
-        $_SESSION['flash'] = [
-            'type' => 'success',
-            'message' => 'Service creado correctamente: ' . $service['name']
-        ];
-        // Redirigir a la lista de deploys
-        return $response->withHeader('Location', './')->withStatus(302);
-    }
-
-    public function editService(Request $request, Response $response, array $args): Response
-    {
-        $name = $args['name']; // Obtiene el parámetro de la URL
-
-        // Obtener todos los datos POST
-        $service = $this->mapService('./edit-service/' . $name, $request, $response);
-        if( is_a($service, Response::class) ) {
-            return $service;
-        }
-
-        $services = new ServiceStore($this->config);
-        $services->set($name, $service);
-        // Mensaje de éxito
-        $_SESSION['flash'] = [
-            'type' => 'success',
-            'message' => 'Deploy creado correctamente: ' . $service['name']
-        ];
-        // Redirigir a la lista de deploys
-        return $response->withHeader('Location', './' . $name)->withStatus(302);
-    }
-
-    public function showAddService(Request $request, Response $response): Response
-    {
-        $response->getBody()->write( $this->template('service-form.twig', [
-            'serviceTypes' => ['postgres', 'mysql', 'redis', 'mongodb', 'nginx', 'apache']
-        ]) );
-        return $response;
-    }
-
-    public function showEditService(Request $request, Response $response, array $args): Response
-    {
-        $name = $args['name']; // Obtiene el parámetro de la URL
-        $services = new ServiceStore($this->config);
-        $service = $services->get( $name );
-        $response->getBody()->write( $this->template('service-form.twig', [
-            'serviceTypes' => ['postgres', 'mysql', 'redis', 'mongodb', 'nginx', 'apache'],
-            'service' => $service]) );
-        return $response;
-    }
-
-    public function addDeploy(Request $request, Response $response): Response
-    {
-        // Obtener todos los datos POST
-        $deploy = $this->mapDeploy('./add-deploy', $request, $response);
-        if( is_a($deploy, Response::class) ) {
-            return $deploy;
-        }
-        $applications = new ApplicationStore($this->config);
-        $applications->set($deploy['name'], $deploy);
-        // Mensaje de éxito
-        $_SESSION['flash'] = [
-            'type' => 'success',
-            'message' => 'Deploy creado correctamente: ' . $deploy['name']
-        ];
-        // Redirigir a la lista de deploys
-        return $response->withHeader('Location', './')->withStatus(302);
-    }
-
-    public function editDeploy(Request $request, Response $response, array $args): Response
-    {
-        $name = $args['name']; // Obtiene el parámetro de la URL
-
-        // Obtener todos los datos POST
-        $deploy = $this->mapDeploy('./edit-deploy/' . $name, $request, $response);
-        if( is_a($deploy, Response::class) ) {
-            return $deploy;
-        }
-
-        $applications = new ApplicationStore($this->config);
-        $applications->set($name, $deploy);
-        // Mensaje de éxito
-        $_SESSION['flash'] = [
-            'type' => 'success',
-            'message' => 'Deploy creado correctamente: ' . $deploy['name']
-        ];
-        // Redirigir a la lista de deploys
-        return $response->withHeader('Location', './' . $name)->withStatus(302);
-    }
-
-    public function showAddDeploy(Request $request, Response $response): Response
-    {
-        $response->getBody()->write( $this->template('deploy-form.twig', []) );
-        return $response;
-    }
-
-    public function showEditDeploy(Request $request, Response $response, array $args): Response
-    {
-        $name = $args['name']; // Obtiene el parámetro de la URL
-        $applications = new ApplicationStore($this->config);
-        $app = $applications->get( $name );
-        $response->getBody()->write( $this->template('deploy-form.twig', ['deploy' => $app]) );
-        return $response;
-    }
-
     public function index(Request $request, Response $response): Response
     {
         $applications = new ApplicationStore($this->config);
         $credentials = new CredentialStore($this->config);
         $services = new ServiceStore($this->config);
-        $this->init( $applications, $services, $credentials);
+        // $this->init( $applications, $services, $credentials);
         $allApps = $applications->all();
         $allServs = $services->all();
         $allCreds = $credentials->all();
@@ -209,9 +92,6 @@ class DashboarController
             'services' => $allServs,
             'credentials' => $allCreds,
         ]));
-        // $response->getBody()->write('Bienvenido al Dashboard: <table><tr><td><pre>' . print_r(value: $allApps, return: true) . '</pre></td>'
-        //      . '<td><pre>' . print_r($allServs, true) . '</pre></td></tr></table>'
-        //      . '<p>Ve a <a href="./deploy/Phylax">Deploy</a>');
         return $response;
     }
 
@@ -286,121 +166,5 @@ class DashboarController
         // Renderizar la plantilla con los datos
         $html = $twig->render($name, $context);
         return $html;
-    }
-
-    private function mapService(string $back, Request $request, Response $response): array|Response {
-        $data = $request->getParsedBody();
-        // Transformar los datos del formulario a la estructura esperada
-        $service = [
-            'name' => $data['name'],
-            'image' => $data['image'],
-            'kind' => $data['kind'],
-            'environment' => [],
-            'ports' => [],
-            'volumes' => []
-        ];
-        
-        // Procesar variables de entorno
-        if (isset($data['environment']['key']) && isset($data['environment']['value'])) {
-            foreach ($data['environment']['key'] as $index => $key) {
-                if (!empty($key)) {
-                    $service['environment'][$key] = $data['environment']['value'][$index];
-                }
-            }
-        }
-        
-        // Procesar puertos
-        if (isset($data['ports']['host']) && isset($data['ports']['container'])) {
-            foreach ($data['ports']['host'] as $index => $host) {
-                if (!empty($host)) {
-                    $service['ports'][$host] = $data['ports']['container'][$index];
-                }
-            }
-        }
-        return $service;
-    }
-    private function mapDeploy(string $back, Request $request, Response $response): array|Response {
-        $postData = $request->getParsedBody();
-            
-        // Validar datos básicos
-        if (empty($postData['name']) || empty($postData['repositoryUrl']) || empty($postData['repositoryPath'])) {
-            // Redirigir con mensaje de error
-            $_SESSION['flash'] = [
-                'type' => 'danger',
-                'message' => 'Los campos nombre, URL del repositorio y ruta del repositorio son obligatorios.'
-            ];
-            return $response->withHeader('Location', $back)->withStatus(302);
-        }
-            // Inicializar la estructura del deploy
-        $deploy = [
-            'name' => $postData['name'],
-            'repositoryUrl' => $postData['repositoryUrl'],
-            'repositoryPath' => $postData['repositoryPath'],
-            'mappers' => [],
-            'services' => []
-        ];
-        
-        // Procesar mappers (puertos)
-        if (isset($postData['mappers']) && isset($postData['mappers']['app']) && isset($postData['mappers']['port'])) {
-            $appNames = $postData['mappers']['app'];
-            $ports = $postData['mappers']['port'];
-            
-            foreach ($appNames as $index => $appName) {
-                if (!empty($appName) && isset($ports[$index]) && !empty($ports[$index])) {
-                    $deploy['mappers'][$appName] = $ports[$index];
-                }
-            }
-        }
-        
-        // Procesar servicios y credenciales
-        if (isset($postData['services']) && isset($postData['services']['name'])) {
-            $serviceNames = $postData['services']['name'];
-            
-            foreach ($serviceNames as $serviceIndex => $serviceName) {
-                if (empty($serviceName)) continue;
-                
-                // Inicializar el servicio
-                $deploy['services'][$serviceName] = [];
-                
-                // Procesar aplicaciones para este servicio
-                if (isset($postData['services'][$serviceIndex]['app'])) {
-                    $appNames = $postData['services'][$serviceIndex]['app'];
-                    
-                    foreach ($appNames as $appIndex => $appName) {
-                        if (empty($appName)) continue;
-                        
-                        // Inicializar la aplicación
-                        $deploy['services'][$serviceName][$appName] = [];
-                        
-                        // Procesar credenciales para esta aplicación
-                        if (isset($postData['services'][$serviceIndex][$appIndex]['cred'])) {
-                            $credNames = $postData['services'][$serviceIndex][$appIndex]['cred'];
-                            
-                            foreach ($credNames as $credIndex => $credName) {
-                                if (empty($credName)) continue;
-                                
-                                // Inicializar la credencial
-                                $deploy['services'][$serviceName][$appName][$credName] = [];
-                                
-                                // Procesar mapeos de propiedades a variables de entorno
-                                if (isset($postData['services'][$serviceIndex][$appIndex][$credIndex]['prop']) && 
-                                    isset($postData['services'][$serviceIndex][$appIndex][$credIndex]['env'])) {
-                                    
-                                    $propNames = $postData['services'][$serviceIndex][$appIndex][$credIndex]['prop'];
-                                    $envNames = $postData['services'][$serviceIndex][$appIndex][$credIndex]['env'];
-                                    
-                                    foreach ($propNames as $mapIndex => $propName) {
-                                        if (!empty($propName) && isset($envNames[$mapIndex]) && !empty($envNames[$mapIndex])) {
-                                            $deploy['services'][$serviceName][$appName][$credName][$propName] = $envNames[$mapIndex];
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return $deploy;
     }
 }
